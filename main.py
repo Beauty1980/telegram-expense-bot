@@ -3,7 +3,7 @@ import requests
 
 app = Flask(__name__)
 
-TOKEN = "8168178274:AAFS4T3KjSeWo1tXCf0tC3SQr1Qc9BU1RM0"
+TOKEN = "TOKEN = "7239204170:AAHNFT7BRtqN0OzXD9OD_DAfY5YJUbTq7DI"
 CHAT_URL = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
 SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwY035vYXieElReF6Eip7Zcq4hAPhJ-wN0xV1nZJJmfxXyAMNIuc8S0UlmzjVYdQ81V/exec"
 
