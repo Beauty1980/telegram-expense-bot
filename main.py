@@ -3,62 +3,72 @@ import requests
 
 app = Flask(__name__)
 
-BOT_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"
-GOOGLE_SCRIPT_URL = "YOUR_GOOGLE_APPS_SCRIPT_WEBHOOK"
+TOKEN = "8168178274:AAFS4T3KjSeWo1tXCf0tC3SQr1Qc9BU1RM0"
+CHAT_URL = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
+SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwY035vYXieElReF6Eip7Zcq4hAPhJ-wN0xV1nZJJmfxXyAMNIuc8S0UlmzjVYdQ81V/exec"
 
-def send_message(chat_id, text):
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    requests.post(url, json={"chat_id": chat_id, "text": text})
+CATEGORIES = {
+    "еда": ["еда", "продукты", "магазин", "яйца", "овощи", "мясо"],
+    "транспорт": ["такси", "автобус", "бензин", "транспорт", "поезд", "маршрутка"],
+    "здоровье": ["аптека", "врач", "больница", "здоровье", "таблетки"],
+    "образование": ["учёба", "школа", "книги", "репетитор", "курсы"],
+    "красота и уход за собой": ["маникюр", "салон", "уход", "косметика", "краска"],
+    "домашнее хозяйство": ["тряпки", "швабра", "моющее", "стирка", "хозяйство"],
+    "подарки": ["подарок", "дар", "сюрприз", "поздравление"],
+    "другое": []
+}
+
+def detect_category(text):
+    for category, keywords in CATEGORIES.items():
+        for word in keywords:
+            if word in text.lower():
+                return category
+    return "другое"
 
 @app.route("/", methods=["POST"])
 def webhook():
-    data = request.json
-    chat_id = data["message"]["chat"]["id"]
-    text = data["message"]["text"]
+    data = request.get_json()
+    print("🔔 Получен POST запрос")
 
     try:
-        words = text.lower().split()
-        digits = [w for w in words if w.isdigit()]
-        if not digits:
-            send_message(chat_id, "❌ Я не нашла сумму в сообщении. Напиши, например: 'Потратила 3000 на продукты'")
-            return "no amount"
-        amount = int(digits[0])
-        description = text
-        category = "другое"
+        message = data["message"]["text"]
+        chat_id = data["message"]["chat"]["id"]
 
-        keywords = {
-            "еда": ["еда", "продукты", "магазин", "обед", "ужин", "завтрак", "фрукты", "овощи"],
-            "транспорт": ["транспорт", "такси", "проезд", "автобус", "метро", "бензин", "маршрутка"],
-            "одежда": ["одежда", "платье", "штаны", "куртка", "кроссовки", "обувь"],
-            "подарки": ["подарок", "подарки", "поздравление"],
-            "красота и уход за собой": ["маникюр", "салон", "косметика", "уход", "крем"],
-            "здоровье": ["аптека", "лекарство", "врач", "здоровье", "витамины", "больница"],
-            "домашнее хозяйство": ["хозтовары", "тряпки", "моющее", "порошок", "бумага"],
-            "образование": ["курсы", "учеба", "школа", "репетитор", "обучение"],
-            "форс-мажор": ["штраф", "поломка", "ремонт"],
-        }
+        print(f"📩 Текст сообщения: {message}")
+        print(f"👤 chat_id: {chat_id}")
 
-        for key, values in keywords.items():
-            if any(word in text.lower() for word in values):
-                category = key
-                break
+        words = message.split()
+        amount = next((int(s.replace("тг", "").replace("тенге", "").replace("₸", "").strip())
+                      for s in words if s.replace("тг", "").replace("тенге", "").replace("₸", "").strip().isdigit()), 0)
 
+        print(f"💰 Сумма: {amount}")
+
+        category = detect_category(message)
+        print(f"🏷 Категория: {category}")
+
+        # Отправка в таблицу
         payload = {
             "amount": amount,
-            "description": description,
-            "category": category
+            "category": category,
+            "comment": message
         }
+        r1 = requests.post(SCRIPT_URL, data=payload)
+        print(f"📊 Таблица ответила: {r1.status_code}")
 
-        r = requests.post(GOOGLE_SCRIPT_URL, json=payload)
-        if r.status_code == 200:
-            send_message(chat_id, f"✅ Записала: {amount} тг — {category}")
-        else:
-            send_message(chat_id, "⚠️ Не удалось отправить данные в таблицу.")
+        # Ответ пользователю
+        reply = f"✅ Записала: {amount} тг — {category}"
+        r2 = requests.post(CHAT_URL, json={"chat_id": chat_id, "text": reply})
+        print(f"📤 Ответ пользователю отправлен: {r2.status_code}")
 
     except Exception as e:
-        send_message(chat_id, f"❌ Ошибка: {str(e)}")
+        print("❌ Ошибка обработки:", e)
 
-    return "ok"
+    return "OK", 200
+
+@app.route("/", methods=["GET"])
+def home():
+    return "Сервер работает!"
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080)
+
